@@ -1,4 +1,15 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   app:
     build: .
     ports:
@@ -6,10 +17,16 @@ services:
     environment:
       PORT: "8000"
       GREETING: "${GREETING:-Hello, Docker!}"
-      STORAGE: "sqlite"
-      DATA_FILE: "/data/counter.db"
-    volumes:
-      - app_data:/data
+      STORAGE: "redis"
+      REDIS_URL: "redis://redis:6379/0"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; urllib.request.urlopen(sys.argv[1])", "http://127.0.0.1:8000/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
-  app_data:
+  redis_data:
